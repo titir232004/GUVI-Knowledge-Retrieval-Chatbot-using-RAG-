@@ -1,150 +1,74 @@
-import os
-import json
-import time
-import re
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
+import requests
 from bs4 import BeautifulSoup
+from readability.readability import Document
+import json
+from urllib.parse import urljoin
 
-BASE_BLOG_URL = "https://www.guvi.in/blog/"
-FAQ_URL = "https://www.guvi.in/faq/"
-COURSES_URL = "https://www.guvi.in/courses"
-OUTPUT_DIR = "output"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+BASE_URL = "https://www.guvi.in"
 
-print("🚀 Starting GUVI Full Content Scraper...")
+def clean_text(text):
+    """Basic cleaning for readability"""
+    return text.strip()
 
-# ------------------ SETUP SELENIUM ------------------
-options = Options()
-options.add_argument("--headless")
-options.add_argument("--no-sandbox")
-options.add_argument("--disable-dev-shm-usage")
-options.add_argument("--window-size=1920,1080")
-options.add_argument("--disable-gpu")
+def scrape_page(url):
+    """Scrape main content from a page"""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        print(f"Failed to fetch {url}")
+        return []
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=options)
+    doc = Document(response.text)
+    html_content = doc.summary()
+    soup = BeautifulSoup(html_content, "html.parser")
+    elements = soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+    content = [clean_text(el.get_text()) for el in elements if len(clean_text(el.get_text())) > 30]
 
+    seen = set()
+    final_content = []
+    for c in content:
+        if c not in seen:
+            seen.add(c)
+            final_content.append(c)
+    return final_content
 
-def get_total_pages():
-    """Detect total number of blog pages from pagination"""
-    driver.get(BASE_BLOG_URL)
-    time.sleep(4)
-    soup = BeautifulSoup(driver.page_source, "html.parser")
-    pagination = soup.select("a.page-numbers")
-    if pagination:
-        numbers = [int(re.sub(r'\D', '', a.get_text())) for a in pagination if a.get_text().isdigit()]
-        return max(numbers) if numbers else 1
-    return 1
+def get_all_urls(listing_url, keyword):
+    """Get all URLs containing a keyword (like 'blog' or 'faq')"""
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(listing_url, headers=headers)
+    if response.status_code != 200:
+        print(f"Failed to fetch {listing_url}")
+        return []
 
+    soup = BeautifulSoup(response.text, "html.parser")
+    urls = set()
+    for a_tag in soup.find_all("a", href=True):
+        href = a_tag['href']
+        if keyword in href:
+            full_url = urljoin(BASE_URL, href)
+            urls.add(full_url)
+    return list(urls)
 
-def get_blog_links(page_num):
-    """Extract blog post URLs from a specific page"""
-    url = BASE_BLOG_URL if page_num == 1 else f"{BASE_BLOG_URL}page/{page_num}/"
-    driver.get(url)
-    time.sleep(3)
-    soup = BeautifulSoup(driver.page_source, "html.parser")
+def scrape_guvi_all():
+    """Scrape blogs + FAQs and save raw content"""
+    blog_listing_url = "https://www.guvi.in/blogs"
+    faq_listing_url = "https://www.guvi.in/faqs"  
 
-    links = []
-    for a in soup.select("a[href]"):
-        href = a["href"]
-        if "/blog/" in href and href.startswith("https://www.guvi.in/blog/") and href != BASE_BLOG_URL:
-            links.append(href)
-    return list(set(links))
+    blog_urls = get_all_urls(blog_listing_url, "blog")
+    faq_urls = get_all_urls(faq_listing_url, "faq")
 
+    all_content = {}
 
-def parse_full_page(url):
-    """Extract full page content including all headings, paragraphs, and lists"""
-    try:
-        driver.get(url)
-        time.sleep(3)
-        soup = BeautifulSoup(driver.page_source, "html.parser")
-        title = soup.title.string.strip() if soup.title else "No Title"
+    for url in blog_urls + faq_urls:
+        print(f"Scraping: {url}")
+        content = scrape_page(url)
+        if content:
+            all_content[url] = content
 
-        content_parts = []
-
-        # Grab headings
-        for h in soup.select("h1,h2,h3,h4,h5,h6"):
-            text = h.get_text(" ", strip=True)
-            if text:
-                content_parts.append(text)
-
-        # Grab paragraphs
-        for p in soup.select("p"):
-            text = p.get_text(" ", strip=True)
-            if text:
-                content_parts.append(text)
-
-        # Grab list items
-        for li in soup.select("li"):
-            text = li.get_text(" ", strip=True)
-            if text:
-                content_parts.append(text)
-
-        # Grab other text containers
-        for div in soup.select(".elementor-widget-container, .entry-content, article, .post-content"):
-            text = div.get_text(" ", strip=True)
-            if text:
-                content_parts.append(text)
-
-        full_content = " ".join(content_parts).strip()
-        return {"url": url, "title": title, "content": full_content}
-
-    except Exception as e:
-        print(f"❌ Error parsing {url}: {e}")
-        return {"url": url, "title": "Error", "content": ""}
-
-
-def get_all_faqs():
-    """Scrape all FAQs from GUVI FAQ page"""
-    driver.get(FAQ_URL)
-    time.sleep(4)
-    soup = BeautifulSoup(driver.page_source, "html.parser")
-    faqs = []
-
-    for el in soup.select("h2, h3, .faq-question, .elementor-tab-title, .elementor-accordion-title"):
-        q_text = el.get_text(strip=True)
-        a_el = el.find_next_sibling(["div", "p"])
-        a_text = a_el.get_text(" ", strip=True) if a_el else ""
-        if q_text:
-            faqs.append({"question": q_text, "answer": a_text})
-
-    print(f"✅ Found {len(faqs)} FAQs")
-    return faqs
-
+    # Save raw content
+    with open("guvi_raw_content.json", "w", encoding="utf-8") as f:
+        json.dump(all_content, f, ensure_ascii=False, indent=4)
+    print(f"Scraped {len(all_content)} pages and saved to guvi_raw_content.json")
 
 if __name__ == "__main__":
-    # Scrape blogs
-    total_pages = get_total_pages()
-    print(f"📄 Total blog pages: {total_pages}")
-
-    all_links = []
-    for i in range(1, total_pages + 1):
-        links = get_blog_links(i)
-        all_links.extend(links)
-    all_links = list(set(all_links))
-    print(f"📰 Total unique blog URLs: {len(all_links)}")
-
-    all_blog_content = []
-    for idx, link in enumerate(all_links):
-        print(f"🧾 [{idx+1}/{len(all_links)}] Scraping: {link}")
-        data = parse_full_page(link)
-        if data["content"]:
-            all_blog_content.append(data)
-
-    faqs = get_all_faqs()
-    courses_page = parse_full_page(COURSES_URL)
-
-    # Combine everything
-    all_docs = all_blog_content + \
-               [{"url": "FAQ", "title": f["question"], "content": f["answer"]} for f in faqs] + \
-               [courses_page]
-
-    output_path = os.path.join(OUTPUT_DIR, "guvi_full_data_full.json")
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(all_docs, f, ensure_ascii=False, indent=2)
-
-    driver.quit()
-    print(f"🎉 Full scraping completed! Saved → {output_path}")
+    scrape_guvi_all()
