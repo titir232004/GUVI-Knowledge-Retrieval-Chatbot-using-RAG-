@@ -1,23 +1,30 @@
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# vector_store.py
+
 import json
-import os
+import numpy as np
+from sentence_transformers import SentenceTransformer
+import faiss
 
-INPUT_FILE = "output/guvi_chunks.json"
-FAISS_DIR = "output/guvi_faiss_index"
+def create_vector_store(chunk_file="guvi_chunks.json", index_file="guvi_faiss.index", mapping_file="chunk_mapping.json"):
+    with open(chunk_file, "r", encoding="utf-8") as f:
+        chunks = json.load(f)
+    print(f"Loaded {len(chunks)} text chunks.")
 
-# Load chunks
-with open(INPUT_FILE, "r", encoding="utf-8") as f:
-    chunks = json.load(f)
+    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    embeddings = model.encode(chunks, show_progress_bar=True, convert_to_numpy=True)
 
-texts = [c["text"] for c in chunks]
-metadatas = [{"url": c.get("url",""), "title": c.get("title",""), "chunk_id": c.get("chunk_id","")} for c in chunks]
+    dim = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dim)
+    index.add(np.array(embeddings))
+    faiss.write_index(index, index_file)
+    print(f"FAISS index created with {index.ntotal} vectors, saved to {index_file}")
 
-# Use the SAME embedding model as in retrieval
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/multi-qa-MiniLM-L6-cos-v1")
-vectorstore = FAISS.from_texts(texts=texts, embedding=embeddings, metadatas=metadatas)
+    chunk_mapping = {i: chunk for i, chunk in enumerate(chunks)}
+    with open(mapping_file, "w", encoding="utf-8") as f:
+        json.dump(chunk_mapping, f, ensure_ascii=False, indent=4)
+    print(f"Chunk mapping saved to {mapping_file}")
 
-# Save FAISS index
-os.makedirs(FAISS_DIR, exist_ok=True)
-vectorstore.save_local(FAISS_DIR)
-print("✅ Rebuilt FAISS vectorstore successfully")
+    return index, chunk_mapping
+
+if __name__ == "__main__":
+    create_vector_store()
