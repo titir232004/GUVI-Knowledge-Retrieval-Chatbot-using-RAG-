@@ -1,56 +1,59 @@
-import os
 import json
 import re
-import pandas as pd
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-
-INPUT_FILE = "output/guvi_full_data.json"
-OUTPUT_FILE_JSON = "output/guvi_chunks.json"
-OUTPUT_FILE_CSV = "output/guvi_chunks.csv"
-
-# Create output directory
-os.makedirs("output", exist_ok=True)
-
-def load_data(file_path):
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"❌ File not found: {file_path}")
-    with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
 
 def clean_text(text):
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+    """Clean text: remove emails, phone numbers, references, strange chars"""
+    text = re.sub(r'\s+', ' ', text).strip()
+    text = re.sub(r'\S+@\S+\.\S+', '', text)  # emails
+    text = re.sub(r'\+?\d[\d\s-]{7,}\d', '', text)  # phones
+    text = re.sub(r'\[.*?\]', '', text)  # references [1]
+    text = re.sub(r'[^A-Za-z0-9.,!?;:()\'"-]', ' ', text)  # strange chars
+    return text
 
-def chunk_documents(data):
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=400,        # smaller chunk size for precise retrieval
-        chunk_overlap=100,
-        separators=["\n\n", ".", "!", "?", ";", ",", " "]
-    )
+def chunk_text(text_list, chunk_size=300, overlap=50):
+    """Split text into overlapping chunks"""
+    chunks = []
+    for text in text_list:
+        words = text.split()
+        start = 0
+        while start < len(words):
+            end = start + chunk_size
+            chunk = ' '.join(words[start:end])
+            chunks.append(chunk)
+            start += (chunk_size - overlap)
+    return chunks
 
-    docs = []
-    for item in data:
-        if "content" not in item or not item["content"].strip():
-            continue
-        content = clean_text(item["content"])
-        chunks = text_splitter.split_text(content)
-        for i, chunk in enumerate(chunks):
-            docs.append({
-                "url": item.get("url"),
-                "title": item.get("title"),
-                "chunk_id": f"{item.get('url')}_part_{i}",
-                "text": chunk
-            })
-    return docs
+def preprocess_guvi():
+    with open("guvi_raw_content.json", "r", encoding="utf-8") as f:
+        raw_content = json.load(f)
 
-def save_output(docs):
-    with open(OUTPUT_FILE_JSON, "w", encoding="utf-8") as f:
-        json.dump(docs, f, ensure_ascii=False, indent=2)
-    pd.DataFrame(docs).to_csv(OUTPUT_FILE_CSV, index=False)
-    print(f"✅ Saved {len(docs)} chunks to {OUTPUT_FILE_JSON} and {OUTPUT_FILE_CSV}")
+    all_texts = []
+    for url, paragraphs in raw_content.items():
+        for para in paragraphs:
+            clean_para = clean_text(para)
+            if len(clean_para) > 30:
+                all_texts.append(clean_para)
+
+    print(f"Total paragraphs before chunking: {len(all_texts)}")
+
+    chunks = chunk_text(all_texts, chunk_size=300, overlap=50)
+    print(f"Total chunks before deduplication: {len(chunks)}")
+
+    seen = set()
+    dedup_chunks = []
+    for chunk in chunks:
+        h = hash(chunk)
+        if h not in seen:
+            seen.add(h)
+            dedup_chunks.append(chunk)
+
+    print(f"Total deduplicated chunks: {len(dedup_chunks)}")
+
+    with open("guvi_chunks.json", "w", encoding="utf-8") as f:
+        json.dump(dedup_chunks, f, ensure_ascii=False, indent=4)
+
+    print("Preprocessing complete! Saved to guvi_chunks.json")
+    return dedup_chunks
 
 if __name__ == "__main__":
-    print("🧹 Preprocessing and chunking GUVI data...")
-    data = load_data(INPUT_FILE)
-    chunks = chunk_documents(data)
-    save_output(chunks)
+    preprocess_guvi()
