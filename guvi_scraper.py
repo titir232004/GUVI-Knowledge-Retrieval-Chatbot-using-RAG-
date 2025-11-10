@@ -72,3 +72,4 @@ def scrape_guvi_all():
 
 if __name__ == "__main__":
     scrape_guvi_all()
+
