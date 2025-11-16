@@ -56,22 +56,16 @@ def process_input():
     user_query = st.session_state.user_input.strip()
 
     if user_query:
-        # Add user message
         st.session_state.history.append({"role": "user", "text": user_query})
 
-        # Generate bot reply
         with st.spinner("Bot is thinking..."):
             bot_reply = engine.answer(user_query)
 
         st.session_state.history.append({"role": "bot", "text": bot_reply})
 
-    # Clear box safely
     st.session_state.user_input = ""
 
 
-# -----------------------
-# MAIN UI
-# -----------------------
 st.markdown(
     """
     <h1 style='text-align:center;'>🤖 GUVI RAG Chatbot</h1>
@@ -108,9 +102,10 @@ with st.sidebar:
 
     st.markdown("## Tips")
     st.write("- Press **ENTER** to send your message.")
-    st.write("- Refresh engine if you replace your GGUF model.")
+    st.write("- Refresh engine if GGUF model is replaced.")
 
     if st.button("Clear Chat"):
         st.session_state.history = []
         engine.memory = []
         st.success("Chat cleared.")
+
