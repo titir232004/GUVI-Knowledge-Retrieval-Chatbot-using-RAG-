@@ -23,33 +23,28 @@ This project uses:
 - 🔐 100% offline — All data stays on your machine  
 - 🗂️ Modular & production-ready code  
 
----
+## 📁 Project Structure
 
-## 📁 Project Architecture
-
-User Query
+GUVI_KNOWLEDGE_RETRIEVAL_CHATBOT
+graphql
+Copy code
+├── raw/                           # Raw scraped HTML & extracted paragraphs
+├── processed/                     # Cleaned text + generated chunks
+├── faiss_store/                   # Vector index + embeddings metadata
 │
-▼
-[Streamlit Chat UI]
+├── models/
+│   └── tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf   # Local LLM (not included in GitHub)
 │
-▼
-[Embedding Model] → Convert query to vector
+├── scrape_and_clean.py            # Step 1: Scrape GUVI blogs & FAQs
+├── chunk_text.py                  # Step 2: Chunk cleaned text
+├── build_faiss_index.py           # Step 3: Build FAISS vector database
+├── faiss_retriever.py             # Retrieval testing script (optional)
 │
-▼
-[FAISS Vector Store] → Retrieve top-k similar chunks
+├── rag_engine_streamlit.py        # Core RAG engine (retriever + generator)
+├── streamlit_app.py               # ChatGPT-style Streamlit UI
 │
-▼
-[Local LLM (TinyLlama GGUF)]
-│
-▼
-Generate final answer based on context
-│
-▼
-ChatGPT-style Response to User
-
-
-
----
+├── requirements.txt               # Python dependencies
+└── README.md                      # Project documentation
 
 ## ⚙️ Requirements
 
@@ -57,7 +52,7 @@ ChatGPT-style Response to User
 **Python 3.10+** recommended
 
 ### 🔹 Install Dependencies
-After cloning your repo, run:
+After cloning repo, run:
 
 ```bash
 pip install -r requirements.txt
