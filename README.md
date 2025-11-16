@@ -26,8 +26,7 @@ This project uses:
 ## 📁 Project Structure
 
 GUVI_KNOWLEDGE_RETRIEVAL_CHATBOT
-graphql
-Copy code
+```
 ├── raw/                           # Raw scraped HTML & extracted paragraphs
 ├── processed/                     # Cleaned text + generated chunks
 ├── faiss_store/                   # Vector index + embeddings metadata
@@ -45,7 +44,7 @@ Copy code
 │
 ├── requirements.txt               # Python dependencies
 └── README.md                      # Project documentation
-
+```
 ## ⚙️ Requirements
 
 ### 🔹 Python Version  
