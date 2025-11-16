@@ -1,24 +1,63 @@
-# GUVI Knowledge Retrieval Chatbot
+# 🤖 GUVI Knowledge Retrieval Chatbot ( RAG System)
 
- **GUVI Knowledge Retrieval Chatbot** is an AI-powered system designed to retrieve information from GUVI’s blog content, courses, and tutorials. It allows users to ask questions in natural language and get precise answers using a knowledge base built from GUVI resources.
+The **GUVI Knowledge Retrieval Chatbot** is an offline AI assistant built using a **Retrieval-Augmented Generation (RAG)** pipeline.  
+It can answer questions using **real GUVI blogs, FAQs, and course information**, all processed, indexed, and queried locally — **no API keys, no internet, no external dependencies**.
 
----
+This project uses:
 
-## Features
-
-- Scrapes and indexes **GUVI blogs, articles, and tutorials**.
-- Converts content into **structured chunks** for fast retrieval.
-- Supports **question-answering** using NLP and vector search.
-- Multi-modal support: **text input**, with optional voice integration.
-- Saves scraped data in **JSON** format for offline processing.
+- **FAISS** for semantic retrieval  
+- **Sentence-Transformers** for text embeddings  
+- **TinyLlama GGUF** (via llama.cpp) for offline LLM inference  **Download Link:** https://huggingface.co/TinyLlama/TinyLlama-1.1B-Chat-v1.0-GGUF/tree/main
+- **Streamlit** for a clean ChatGPT-style chat UI  
 
 ---
 
-## Requirements
+## ✨ Features
 
-- Python 3.10+  
-- Google Chrome + ChromeDriver (if using Selenium for scraping)  
-- Python packages:
+- 🔍 Scrapes and cleans **GUVI Blogs & FAQs**  
+- ✂️ Splits content into high-quality text chunks  
+- 🧠 Embeds content using **all-MiniLM-L6-v2**  
+- ⚡ Fast similarity search using **FAISS vector DB**  
+- 🤖 Offline large language model (TinyLlama) for response generation  
+- 💬 Beautiful **ChatGPT-style UI** built in Streamlit  
+- 🔐 100% offline — All data stays on your machine  
+- 🗂️ Modular & production-ready code  
+
+---
+
+## 📁 Project Architecture
+
+User Query
+│
+▼
+[Streamlit Chat UI]
+│
+▼
+[Embedding Model] → Convert query to vector
+│
+▼
+[FAISS Vector Store] → Retrieve top-k similar chunks
+│
+▼
+[Local LLM (TinyLlama GGUF)]
+│
+▼
+Generate final answer based on context
+│
+▼
+ChatGPT-style Response to User
+
+
+
+---
+
+## ⚙️ Requirements
+
+### 🔹 Python Version  
+**Python 3.10+** recommended
+
+### 🔹 Install Dependencies
+After cloning your repo, run:
 
 ```bash
 pip install -r requirements.txt
